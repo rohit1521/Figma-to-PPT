@@ -9,11 +9,16 @@
   <body>
     <h3>Convert Figma Frame to PowerPoint</h3>
     <button id="convert-btn">Convert Selected Frame</button>
+    <div id="status"></div>
 
     <script>
       const convertBtn = document.getElementById('convert-btn');
+      const statusDiv = document.getElementById('status');
+
+      const scaleFactor = 0.75; // Scale all text elements by 75%
 
       convertBtn.onclick = () => {
+        statusDiv.textContent = "Processing...";
         // Ask Figma for frame data
         parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
       };
@@ -60,12 +65,27 @@
 
         frameData.forEach((element) => {
           if (element.type === "TEXT") {
+            // Convert Figma RGB to Hex
+            const color = element.fontColor || "#000000"; // Default to black
+            const fontFace = element.fontName || "Arial"; // Default font family
+            const fontWeight = element.fontWeight > 600 ? "bold" : "normal";
+            
+            // Scale font size, width, and height by 0.75
+            const scaledFontSize = element.fontSize * scaleFactor;
+            const scaledWidth = element.width + 16;
+            const scaledHeight = element.height;
+
             slide.addText(element.text, {
               x: element.x / 96, // Convert from pixels to inches
               y: element.y / 96,
-              w: element.width / 96,
-              h: element.height / 96,
-              fontSize: element.fontSize
+              w: scaledWidth / 82,  // Scale the width
+              h: scaledHeight / 96,  // Scale the height
+              fontSize: scaledFontSize,  // Scale the font size
+              fontFace: fontFace, // Use Figma's font or fallback to Arial
+              color: color, // Set the color
+              bold: fontWeight === "bold", // Set bold if fontWeight is 700
+              autoFit: false, // Disable text auto-fit to avoid wrapping
+              isTextBox: true // Force text to fit within the defined box
             });
           } else if (element.type === "IMAGE") {
             slide.addImage({
@@ -85,7 +105,17 @@
           link.href = url;
           link.download = 'presentation.pptx';
           link.click();
+
+          statusDiv.textContent = "PPTX file generated!";
         });
+      }
+
+      // Helper function to convert RGB color to Hex
+      function rgbToHex(r, g, b) {
+        r = Math.round(r * 255);
+        g = Math.round(g * 255);
+        b = Math.round(b * 255);
+        return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
       }
     </script>
   </body>
