@@ -7,15 +7,13 @@
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.9.0/dist/pptxgen.bundle.js"></script>
   </head>
   <body>
-    <h3>Convert Figma Frame to PowerPoint</h3>
-    <button id="convert-btn">Convert Selected Frame</button>
+    <h3>Convert Figma Frames to PowerPoint</h3>
+    <button id="convert-btn">Convert Selected Frames</button>
     <div id="status"></div>
 
     <script>
       const convertBtn = document.getElementById('convert-btn');
       const statusDiv = document.getElementById('status');
-
-      const scaleFactor = 0.75; // Scale all text elements by 75%
 
       convertBtn.onclick = () => {
         statusDiv.textContent = "Processing...";
@@ -25,10 +23,9 @@
 
       window.onmessage = async (event) => {
         const msg = event.data.pluginMessage;
-        if (msg.type === 'frame-data') {
-          const frameData = msg.frameData;
-          const processedFrameData = await processFrameData(frameData);
-          generatePPT(processedFrameData);
+        if (msg.type === 'frame-data-array') {
+          const frameDataArray = msg.frameDataArray;
+          generatePPT(frameDataArray);
         }
       };
 
@@ -59,44 +56,50 @@
       }
 
       // Function to generate the PowerPoint file using pptxgenjs
-      function generatePPT(frameData) {
+      async function generatePPT(frameDataArray) {
         const pptx = new PptxGenJS();
-        const slide = pptx.addSlide();
+        const scaleFactor = 0.75; // Scale all text elements by 75%
 
-        frameData.forEach((element) => {
-          if (element.type === "TEXT") {
-            // Convert Figma RGB to Hex
-            const color = element.fontColor || "#000000"; // Default to black
-            const fontFace = element.fontName || "Arial"; // Default font family
-            const fontWeight = element.fontWeight > 600 ? "bold" : "normal";
-            
-            // Scale font size, width, and height by 0.75
-            const scaledFontSize = element.fontSize * scaleFactor;
-            const scaledWidth = element.width + 16;
-            const scaledHeight = element.height;
+        // Iterate over all frames and create a slide for each frame
+        for (const frameData of frameDataArray) {
+          const slide = pptx.addSlide();
+          const processedFrameData = await processFrameData(frameData);
 
-            slide.addText(element.text, {
-              x: element.x / 96, // Convert from pixels to inches
-              y: element.y / 96,
-              w: scaledWidth / 82,  // Scale the width
-              h: scaledHeight / 96,  // Scale the height
-              fontSize: scaledFontSize,  // Scale the font size
-              fontFace: fontFace, // Use Figma's font or fallback to Arial
-              color: color, // Set the color
-              bold: fontWeight === "bold", // Set bold if fontWeight is 700
-              autoFit: false, // Disable text auto-fit to avoid wrapping
-              isTextBox: true // Force text to fit within the defined box
-            });
-          } else if (element.type === "IMAGE") {
-            slide.addImage({
-              data: element.imageBase64,
-              x: element.x / 96,
-              y: element.y / 96,
-              w: element.width / 96,
-              h: element.height / 96
-            });
-          }
-        });
+          processedFrameData.forEach((element) => {
+            if (element.type === "TEXT") {
+              // Convert Figma RGB to Hex
+              const color = element.fontColor || "#000000"; // Default to black
+              const fontFace = element.fontName || "Arial"; // Default font family
+              const fontWeight = element.fontWeight > 600 ? "bold" : "normal";
+              
+              // Scale font size, width, and height by 0.75
+              const scaledFontSize = element.fontSize * scaleFactor;
+              const scaledWidth = element.width + 16;
+              const scaledHeight = element.height;
+
+              slide.addText(element.text, {
+                x: element.x / 96, // Convert from pixels to inches
+                y: element.y / 96,
+                w: scaledWidth / 82,  // Scale the width
+                h: scaledHeight / 96,  // Scale the height
+                fontSize: scaledFontSize,  // Scale the font size
+                fontFace: fontFace, // Use Figma's font or fallback to Arial
+                color: color, // Set the color
+                bold: fontWeight === "bold", // Set bold if fontWeight is 700
+                autoFit: false, // Disable text auto-fit to avoid wrapping
+                isTextBox: true // Force text to fit within the defined box
+              });
+            } else if (element.type === "IMAGE") {
+              slide.addImage({
+                data: element.imageBase64,
+                x: element.x / 96,
+                y: element.y / 96,
+                w: element.width / 96,
+                h: element.height / 96
+              });
+            }
+          });
+        }
 
         // Generate the PPTX file and trigger download
         pptx.write('blob').then((pptBlob) => {
