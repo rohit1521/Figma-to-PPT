@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frame to PPT Converter</title>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.9.0/dist/pptxgen.bundle.js"></script>
+  </head>
+  <body>
+    <h3>Convert Figma Frame to PowerPoint</h3>
+    <button id="convert-btn">Convert Selected Frame</button>
+
+    <script>
+      const convertBtn = document.getElementById('convert-btn');
+
+      convertBtn.onclick = () => {
+        // Ask Figma for frame data
+        parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
+      };
+
+      window.onmessage = async (event) => {
+        const msg = event.data.pluginMessage;
+        if (msg.type === 'frame-data') {
+          const frameData = msg.frameData;
+          const processedFrameData = await processFrameData(frameData);
+          generatePPT(processedFrameData);
+        }
+      };
+
+      // Function to convert image bytes to Base64
+      function convertBytesToBase64(bytes) {
+        return new Promise((resolve) => {
+          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      // Process frame data and convert image bytes to Base64
+      async function processFrameData(frameData) {
+        const processedData = [];
+
+        for (const element of frameData) {
+          if (element.type === "IMAGE") {
+            const base64Image = await convertBytesToBase64(element.imageBytes);
+            processedData.push({ ...element, imageBase64: base64Image });
+          } else {
+            processedData.push(element);
+          }
+        }
+
+        return processedData;
+      }
+
+      // Function to generate the PowerPoint file using pptxgenjs
+      function generatePPT(frameData) {
+        const pptx = new PptxGenJS();
+        const slide = pptx.addSlide();
+
+        frameData.forEach((element) => {
+          if (element.type === "TEXT") {
+            slide.addText(element.text, {
+              x: element.x / 96, // Convert from pixels to inches
+              y: element.y / 96,
+              w: element.width / 96,
+              h: element.height / 96,
+              fontSize: element.fontSize
+            });
+          } else if (element.type === "IMAGE") {
+            slide.addImage({
+              data: element.imageBase64,
+              x: element.x / 96,
+              y: element.y / 96,
+              w: element.width / 96,
+              h: element.height / 96
+            });
+          }
+        });
+
+        // Generate the PPTX file and trigger download
+        pptx.write('blob').then((pptBlob) => {
+          const link = document.createElement('a');
+          const url = URL.createObjectURL(pptBlob);
+          link.href = url;
+          link.download = 'presentation.pptx';
+          link.click();
+        });
+      }
+    </script>
+  </body>
+</html>

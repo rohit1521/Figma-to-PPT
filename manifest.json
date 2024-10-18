@@ -1,0 +1,18 @@
+{
+  "name": "Fig PPT 2",
+  "id": "1429112411482976285",
+  "api": "1.0.0",
+  "main": "code.js",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma"
+  ],
+  "ui": "ui.html",
+  "networkAccess": {
+    "allowedDomains": [
+      "https://cdn.jsdelivr.net"
+    ]
+  }
+}
