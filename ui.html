@@ -1,93 +1,413 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Frame to PPT Converter</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Figma to PPT</title>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        color: #f0f0f0;
+        background-color: #2c2c2c;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Navigation Section */
+      .nav {
+        display: flex;
+        justify-content: flex-start;
+        padding: 12px;
+        background-color: #2c2c2c;
+        border-bottom: 1px solid #444444;
+      }
+
+      .nav-item {
+        padding: 0 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #b2b2b2;
+        cursor: pointer;
+      }
+
+      .nav-item.active {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      /* Frame Information Section */
+      .frame-info {
+        flex-grow: 1;
+        padding: 12px;
+        background-color: #1c1c1c;
+        border-bottom: 1px solid #444444;
+        overflow-y: auto; /* Enable vertical scrolling */
+      }
+
+      .frame-item {
+        background-color: #3c3c3c;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+      }
+
+      .frame-thumbnail {
+        width: 40px;
+        height: 40px;
+        background-color: #555555;
+        border-radius: 5px;
+        margin-right: 10px;
+      }
+
+      .frame-details {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .frame-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .frame-text-image-count {
+        font-size: 12px;
+        color: #b2b2b2;
+        margin-top: 4px;
+      }
+
+      .frame-size {
+        font-size: 12px;
+        position: relative;
+        cursor: pointer;
+      }
+
+      /* Tooltip for Aspect Ratio Warning */
+      .frame-size .tooltip {
+        visibility: hidden;
+        width: 180px;
+        background-color: #2c2c2c;
+        color: #fff;
+        text-align: center;
+        border-radius: 5px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 100%; /* Position above the frame size text */
+        right: 0; /* Align the right end with the frame size text */
+        margin-bottom: 10px; /* Space between tooltip and frame size */
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .frame-size .tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%; /* Arrow below the tooltip */
+        right: 5px; /* Adjust to match tooltip's right end */
+        border-width: 5px;
+        border-style: solid;
+        border-color: #2c2c2c transparent transparent transparent;
+      }
+
+      /* Show Tooltip on Hover */
+      .frame-size:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* Highlight for non-16:9 Aspect Ratios */
+      .non-16-9 .frame-size {
+        color: #ffa800;
+      }
+
+      /* No Frames Selected Section */
+      .no-frames {
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #ffffff;
+        font-size: 16px;
+        padding: 20px;
+      }
+
+      /* Styling for No Frames Screen */
+      .no-frames .message-box {
+        position: relative;
+        width: 320px;
+        height: 200px;
+        margin: 0 auto;
+        background-color: #2c2c2c;
+      }
+
+      .message-box .frame-placeholder {
+        width: 160px;
+        height: 100px;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 20px;
+        background-color: #3c3c3c;
+        border-radius: 8px;
+        border: 1px solid #0081f9;
+      }
+
+      .message-box .frame-placeholder::before {
+        content: "#Frame";
+        position: absolute;
+        color: #0081f9;
+        font-size: 12px;
+        top: -20px;
+        left: 0;
+      }
+
+      .message-box .frame-icon {
+        width: 48px;
+        height: 48px;
+        background-color: #444343;
+        position: absolute;
+        top: 40px;
+        left: 10px;
+        border-radius: 8px;
+      }
+
+      .message-box .frame-text {
+        width: 64px;
+        height: 12px;
+        background-color: #444343;
+        position: absolute;
+        top: 40px;
+        left: 70px;
+        border-radius: 4px;
+      }
+
+      .message-box .frame-subtext {
+        width: 40px;
+        height: 12px;
+        background-color: #444343;
+        position: absolute;
+        top: 60px;
+        left: 70px;
+        border-radius: 4px;
+      }
+
+      .message-box .message-text {
+        position: absolute;
+        top: 130px;
+        width: 100%;
+        padding-top: 16px;
+        color: #f0f0f0;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .message-box .instructions {
+        position: absolute;
+        top: 160px;
+        width: 100%;
+        padding-top: 16px;
+        color: #f0f0f0;
+        font-size: 12px;
+      }
+
+      /* Sticky Footer with Convert Button */
+      .footer {
+        padding: 16px;
+        background-color: #2c2c2c;
+        border-top: 1px solid #444444;
+        position: sticky;
+        bottom: 0;
+      }
+
+      .button {
+        background-color: #e05534; /* Orange color */
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        width: 100%;
+        height: 44px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.3s;
+      }
+
+      .button.disabled {
+        background-color: #3c3c3c; /* Gray for disabled state */
+        color: rgba(255, 255, 255, 0.5);
+        cursor: not-allowed;
+      }
+
+      .button:hover:not(.disabled) {
+        background-color: lighten(#e05534, 10%);
+      }
+
+      #status {
+        color: #ffa800;
+        font-size: 12px;
+        text-align: center;
+        margin-top: 8px;
+      }
+
+      /* Hide Footer When Not on Converter Tab */
+      .footer.hidden {
+        display: none;
+      }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.9.0/dist/pptxgen.bundle.js"></script>
   </head>
   <body>
-    <h3>Convert Figma Frames to PowerPoint</h3>
-    <button id="convert-btn">Convert Selected Frames</button>
-    <div id="status"></div>
+
+    <!-- Navigation Bar with Tabs -->
+    <div class="nav">
+      <div class="nav-item active" id="tab-converter">Converter</div>
+      <div class="nav-item" id="tab-settings">Settings</div>
+      <div class="nav-item" id="tab-about">About</div>
+    </div>
+
+    <!-- No Frames Selected Placeholder -->
+    <div class="no-frames" id="no-frames">
+      <div class="message-box">
+        <div class="frame-placeholder">
+          <div class="frame-icon"></div>
+          <div class="frame-text"></div>
+          <div class="frame-subtext"></div>
+        </div>
+        <div class="message-text">Select frames on Figma to convert</div>
+        <div class="instructions">For the best result, select a frame with a 16:9 aspect ratio.</div>
+      </div>
+    </div>
+
+    <!-- Frame Information Section (List of Frames) -->
+    <div class="frame-info" id="frame-info" style="display: none;">
+      <div id="frame-list">
+        <!-- Frame details will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <!-- Footer with Convert Button (Initially visible only on Converter Tab) -->
+    <div class="footer" id="footer">
+      <button class="button disabled" id="convert-btn" disabled>Convert Selected Frames</button>
+      <div id="status"></div>
+    </div>
 
     <script>
       const convertBtn = document.getElementById('convert-btn');
       const statusDiv = document.getElementById('status');
+      const footer = document.getElementById('footer');
+      const tabs = document.querySelectorAll('.nav-item');
+      const frameInfoContainer = document.getElementById('frame-info');
+      const frameList = document.getElementById('frame-list');
+      const noFramesContainer = document.getElementById('no-frames');
 
-      convertBtn.onclick = () => {
-        statusDiv.textContent = "Processing...";
-        // Ask Figma for frame data
-        parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
-      };
+      // Add active class to the clicked tab and show/hide the footer
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
 
+          // Show the footer and frame info only on the "Converter" tab
+          if (tab.id === 'tab-converter') {
+            footer.classList.remove('hidden');
+            frameInfoContainer.style.display = frameList.childElementCount > 0 ? 'block' : 'none';
+            noFramesContainer.style.display = frameList.childElementCount === 0 ? 'flex' : 'none';
+          } else {
+            footer.classList.add('hidden');
+            frameInfoContainer.style.display = "none"; // Hide frame info in other tabs
+            noFramesContainer.style.display = 'none'; // Hide "No Frames" screen in other tabs
+          }
+        });
+      });
+
+      // Convert button click event
+      convertBtn.addEventListener('click', () => {
+        if (!convertBtn.classList.contains('disabled')) {
+          statusDiv.textContent = "Processing...";
+          console.log("Convert button clicked, requesting frame data...");
+          parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
+        }
+      });
+
+      // Handle messages from Figma
       window.onmessage = async (event) => {
-        const msg = event.data.pluginMessage;
-        if (msg.type === 'frame-data-array') {
-          const frameDataArray = msg.frameDataArray;
+        const message = event.data.pluginMessage;
+
+        if (message.type === 'update-frames') {
+          const frames = message.frames;
+          frameList.innerHTML = ""; // Clear the list before updating
+
+          if (frames.length > 0) {
+            frames.forEach(frame => {
+              const frameItem = document.createElement('div');
+              frameItem.className = `frame-item ${frame.aspectRatioWarning ? 'non-16-9' : ''}`;
+              frameItem.innerHTML = `
+                <img class="frame-thumbnail" src="${frame.thumbnail}" alt="Frame Thumbnail">
+                <div class="frame-details">
+                  <div class="frame-name">${frame.name}</div>
+                  <div class="frame-text-image-count">${frame.textCount} Texts, ${frame.imageCount} Images</div>
+                </div>
+                <div class="frame-size">${frame.width} x ${frame.height}
+                  ${frame.aspectRatioWarning ? '<div class="tooltip">Aspect ratio is not 16:9, conversion may not look optimal.</div>' : ''}
+                </div>
+              `;
+              frameList.appendChild(frameItem);
+            });
+
+            convertBtn.classList.remove('disabled');
+            convertBtn.disabled = false;
+
+            // Show frame info and hide the "no frames" message
+            frameInfoContainer.style.display = 'block';
+            noFramesContainer.style.display = 'none';
+          } else {
+            convertBtn.classList.add('disabled');
+            convertBtn.disabled = true;
+
+            // Show "No Frames" message and hide frame info
+            frameInfoContainer.style.display = 'none';
+            noFramesContainer.style.display = 'flex';
+          }
+        }
+
+        if (message.type === 'frame-data-array') {
+          console.log("Received frame data from Figma: ", message.frameDataArray);
+          const frameDataArray = message.frameDataArray;
           generatePPT(frameDataArray);
         }
       };
 
-      // Function to convert image bytes to Base64
-      function convertBytesToBase64(bytes) {
-        return new Promise((resolve) => {
-          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-      }
-
-      // Process frame data and convert image bytes to Base64
-      async function processFrameData(frameData) {
-        const processedData = [];
-
-        for (const element of frameData) {
-          if (element.type === "IMAGE") {
-            const base64Image = await convertBytesToBase64(element.imageBytes);
-            processedData.push({ ...element, imageBase64: base64Image });
-          } else {
-            processedData.push(element);
-          }
-        }
-
-        return processedData;
-      }
-
-      // Function to generate the PowerPoint file using pptxgenjs
       async function generatePPT(frameDataArray) {
         const pptx = new PptxGenJS();
-        const scaleFactor = 0.75; // Scale all text elements by 75%
+        const scaleFactor = 0.75;
 
-        // Iterate over all frames and create a slide for each frame
         for (const frameData of frameDataArray) {
           const slide = pptx.addSlide();
           const processedFrameData = await processFrameData(frameData);
 
           processedFrameData.forEach((element) => {
             if (element.type === "TEXT") {
-              // Convert Figma RGB to Hex
-              const color = element.fontColor || "#000000"; // Default to black
-              const fontFace = element.fontName || "Arial"; // Default font family
-              const fontWeight = element.fontWeight > 600 ? "bold" : "normal";
-              
-              // Scale font size, width, and height by 0.75
-              const scaledFontSize = element.fontSize * scaleFactor;
-              const scaledWidth = element.width + 16;
-              const scaledHeight = element.height;
-
               slide.addText(element.text, {
-                x: element.x / 96, // Convert from pixels to inches
+                x: (element.x - 8 ) / 96,
                 y: element.y / 96,
-                w: scaledWidth / 82,  // Scale the width
-                h: scaledHeight / 96,  // Scale the height
-                fontSize: scaledFontSize,  // Scale the font size
-                fontFace: fontFace, // Use Figma's font or fallback to Arial
-                color: color, // Set the color
-                bold: fontWeight === "bold", // Set bold if fontWeight is 700
-                autoFit: false, // Disable text auto-fit to avoid wrapping
-                isTextBox: true // Force text to fit within the defined box
+                w: (element.width + 16) / 80,
+                h: element.height / 96,
+                fontSize: element.fontSize * scaleFactor,
+                fontFace: element.fontName || "Arial",
+                color: element.fontColor || "#000000",
+                bold: element.fontWeight > 500
               });
             } else if (element.type === "IMAGE") {
               slide.addImage({
@@ -101,7 +421,6 @@
           });
         }
 
-        // Generate the PPTX file and trigger download
         pptx.write('blob').then((pptBlob) => {
           const link = document.createElement('a');
           const url = URL.createObjectURL(pptBlob);
@@ -110,15 +429,32 @@
           link.click();
 
           statusDiv.textContent = "PPTX file generated!";
+        }).catch(error => {
+          statusDiv.textContent = "Error generating PPTX!";
+          console.error("Error generating PPTX: ", error);
         });
       }
 
-      // Helper function to convert RGB color to Hex
-      function rgbToHex(r, g, b) {
-        r = Math.round(r * 255);
-        g = Math.round(g * 255);
-        b = Math.round(b * 255);
-        return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+      function convertBytesToBase64(bytes) {
+        return new Promise((resolve) => {
+          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      async function processFrameData(frameData) {
+        const processedData = [];
+        for (const element of frameData) {
+          if (element.type === "IMAGE") {
+            const base64Image = await convertBytesToBase64(element.imageBytes);
+            processedData.push({ ...element, imageBase64: base64Image });
+          } else {
+            processedData.push(element);
+          }
+        }
+        return processedData;
       }
     </script>
   </body>

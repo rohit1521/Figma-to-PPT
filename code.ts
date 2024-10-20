@@ -1,5 +1,40 @@
 figma.showUI(__html__, { width: 300, height: 400 });
 
+// Function to gather the selected frames and send them to the UI
+async function updateSelectedFrames() {
+  const selectedFrames = figma.currentPage.selection.filter(node => node.type === 'FRAME') as FrameNode[];
+
+  const frameData = await Promise.all(selectedFrames.map(async frame => {
+    // Export frame as a PNG thumbnail
+    const imageBytes = await frame.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 0.25 } });
+    const thumbnail = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
+
+    // Calculate aspect ratio
+    const aspectRatio = frame.width / frame.height;
+    const aspectRatioWarning = Math.abs(aspectRatio - (16 / 9)) > 0.01;
+
+    return {
+      name: frame.name,
+      width: frame.width,
+      height: frame.height,
+      textCount: frame.findAll(node => node.type === 'TEXT').length,
+      imageCount: frame.findAll(node => node.type !== 'TEXT').length,
+      aspectRatioWarning,
+      thumbnail
+    };
+  }));
+
+  // Send the frames data to the UI
+  figma.ui.postMessage({ type: 'update-frames', frames: frameData });
+}
+
+// Initial call when the plugin is run
+updateSelectedFrames();
+
+// Update frames data on selection change
+figma.on('selectionchange', updateSelectedFrames);
+
+// Handle messages from the UI
 figma.ui.onmessage = async (msg) => {
   if (msg.type === 'request-frame-data') {
     const selectedNodes = figma.currentPage.selection;
@@ -33,9 +68,6 @@ figma.ui.onmessage = async (msg) => {
       // If the aspect ratio is close to 16:9, scale the frame to fit 960x540
       if (Math.abs(aspectRatio - targetAspectRatio) < 0.01) {
         scaleFactor = targetWidth / frameWidth; // Scale based on width
-        console.log(`Scaling frame from ${frameWidth}x${frameHeight} to 960x540. Scale factor: ${scaleFactor}`);
-      } else {
-        console.log(`Frame is not 16:9, no scaling applied. Aspect ratio: ${aspectRatio}`);
       }
 
       const frameData = [];
@@ -47,40 +79,24 @@ figma.ui.onmessage = async (msg) => {
           let fontColor = "#000";
           let fontWeight = 400; // Default to normal weight
 
-          // Safely handle fontName, wrapping in String() if it's a symbol
           if (typeof child.fontName !== "symbol" && child.fontName) {
             fontName = child.fontName.family;
-          } else if (typeof child.fontName === "symbol") {
-            console.warn("fontName is a symbol, possible mixed fonts");
-            fontName = String(child.fontName);
           }
 
-          // Safely handle fills (font color)
           if (typeof child.fills !== "symbol" && child.fills.length > 0 && child.fills[0].type === "SOLID") {
             const fill = child.fills[0];
             fontColor = rgbToHex(fill.color.r, fill.color.g, fill.color.b);
           }
 
-          // Safely handle fontSize (ensure it's a number)
           let fontSize = 12; // Default font size
           if (typeof child.fontSize === "number") {
             fontSize = child.fontSize * scaleFactor;
           }
 
-          // Debugging: Log the fontWeight to the console
-          if (typeof child.fontWeight === "symbol") {
-            console.warn("fontWeight is a symbol, possible mixed weights");
-            console.log(`Text: "${child.characters}", Font Weight (as symbol): ${String(child.fontWeight)}`);
-          } else {
-            console.log(`Text: "${child.characters}", Font Weight: ${child.fontWeight}`);
-          }
-
-          // Infer font weight if available and not a symbol
           if (typeof child.fontWeight !== "symbol" && child.fontWeight > 600) {
             fontWeight = 700; // Bold weight
           }
 
-          // Scale the text position and dimensions
           frameData.push({
             type: "TEXT",
             text: child.characters,
@@ -94,7 +110,6 @@ figma.ui.onmessage = async (msg) => {
             height: child.height * scaleFactor
           });
         } else {
-          // Only export non-text layers that can be exported as images
           if (child.exportAsync) {
             const exportOptions: ExportSettingsImage = {
               format: "PNG",
@@ -105,28 +120,22 @@ figma.ui.onmessage = async (msg) => {
               const imageBytes = await child.exportAsync(exportOptions);
               frameData.push({
                 type: "IMAGE",
-                imageBytes: Array.from(imageBytes),  // Convert Uint8Array to normal array for sending to UI
+                imageBytes: Array.from(imageBytes),
                 x: child.x * scaleFactor,
                 y: child.y * scaleFactor,
                 width: child.width * scaleFactor,
                 height: child.height * scaleFactor
               });
             } catch (error) {
-              if (error instanceof Error) {
-                figma.notify("Error exporting image: " + error.message);
-              } else {
-                figma.notify("An unknown error occurred during export.");
-              }
+              figma.notify("Error exporting image: " + (error instanceof Error ? error.message : "unknown error"));
             }
           }
         }
       }
 
-      // Add the processed frame data for the current frame to the array
       frameDataArray.push(frameData);
     }
 
-    // Send frame data for all selected frames to the UI
     figma.ui.postMessage({ type: 'frame-data-array', frameDataArray });
   }
 };
