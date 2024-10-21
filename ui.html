@@ -72,6 +72,7 @@
 
       .frame-name {
         font-size: 12px;
+        max-width: 120px;
         font-weight: 600;
         color: #ffffff;
         white-space: nowrap;
@@ -94,17 +95,17 @@
       /* Tooltip for Aspect Ratio Warning */
       .frame-size .tooltip {
         visibility: hidden;
-        width: 180px;
+        width: 200px;
         background-color: #2c2c2c;
         color: #fff;
-        text-align: center;
+        text-align: left;
         border-radius: 5px;
         padding: 8px;
         position: absolute;
         z-index: 1;
         bottom: 100%; /* Position above the frame size text */
         right: 0; /* Align the right end with the frame size text */
-        margin-bottom: 10px; /* Space between tooltip and frame size */
+        margin-bottom: 0px; /* Space between tooltip and frame size */
         opacity: 0;
         transition: opacity 0.3s;
       }
@@ -242,6 +243,8 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        border: none; /* Remove the border */
+        box-shadow: none; /* Remove any shadow effect */
         transition: background-color 0.3s;
       }
 
@@ -252,14 +255,16 @@
       }
 
       .button:hover:not(.disabled) {
-        background-color: lighten(#e05534, 10%);
+        background-color:#c04323;
+        transform: scale(1.004);
       }
 
       #status {
-        color: #ffa800;
+        color: #ffffff;
         font-size: 12px;
+        font-weight: 600;
         text-align: center;
-        margin-top: 8px;
+        margin-bottom: 8px;
       }
 
       /* Hide Footer When Not on Converter Tab */
@@ -300,8 +305,8 @@
 
     <!-- Footer with Convert Button (Initially visible only on Converter Tab) -->
     <div class="footer" id="footer">
-      <button class="button disabled" id="convert-btn" disabled>Convert Selected Frames</button>
       <div id="status"></div>
+      <button class="button disabled" id="convert-btn" disabled>Convert Selected Frames</button>
     </div>
 
     <script>
@@ -312,13 +317,13 @@
       const frameInfoContainer = document.getElementById('frame-info');
       const frameList = document.getElementById('frame-list');
       const noFramesContainer = document.getElementById('no-frames');
-
+    
       // Add active class to the clicked tab and show/hide the footer
       tabs.forEach(tab => {
         tab.addEventListener('click', function () {
           tabs.forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
-
+    
           // Show the footer and frame info only on the "Converter" tab
           if (tab.id === 'tab-converter') {
             footer.classList.remove('hidden');
@@ -331,24 +336,38 @@
           }
         });
       });
-
+    
       // Convert button click event
       convertBtn.addEventListener('click', () => {
         if (!convertBtn.classList.contains('disabled')) {
+          disableConvertButton(); // Disable the button while processing
           statusDiv.textContent = "Processing...";
+          statusDiv.style.display = 'block';  // Ensure the status is shown
           console.log("Convert button clicked, requesting frame data...");
           parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
         }
       });
-
+    
+      // Function to disable the convert button
+      function disableConvertButton() {
+        convertBtn.classList.add('disabled');
+        convertBtn.disabled = true;
+      }
+    
+      // Function to enable the convert button
+      function enableConvertButton() {
+        convertBtn.classList.remove('disabled');
+        convertBtn.disabled = false;
+      }
+    
       // Handle messages from Figma
       window.onmessage = async (event) => {
         const message = event.data.pluginMessage;
-
+    
         if (message.type === 'update-frames') {
           const frames = message.frames;
           frameList.innerHTML = ""; // Clear the list before updating
-
+    
           if (frames.length > 0) {
             frames.forEach(frame => {
               const frameItem = document.createElement('div');
@@ -365,42 +384,36 @@
               `;
               frameList.appendChild(frameItem);
             });
-
-            convertBtn.classList.remove('disabled');
-            convertBtn.disabled = false;
-
-            // Show frame info and hide the "no frames" message
+    
+            enableConvertButton(); // Enable the button once frames are loaded
             frameInfoContainer.style.display = 'block';
             noFramesContainer.style.display = 'none';
           } else {
-            convertBtn.classList.add('disabled');
-            convertBtn.disabled = true;
-
-            // Show "No Frames" message and hide frame info
+            disableConvertButton(); // Disable the button when no frames are selected
             frameInfoContainer.style.display = 'none';
             noFramesContainer.style.display = 'flex';
           }
         }
-
+    
         if (message.type === 'frame-data-array') {
           console.log("Received frame data from Figma: ", message.frameDataArray);
           const frameDataArray = message.frameDataArray;
           generatePPT(frameDataArray);
         }
       };
-
+    
       async function generatePPT(frameDataArray) {
         const pptx = new PptxGenJS();
         const scaleFactor = 0.75;
-
+    
         for (const frameData of frameDataArray) {
           const slide = pptx.addSlide();
           const processedFrameData = await processFrameData(frameData);
-
+    
           processedFrameData.forEach((element) => {
             if (element.type === "TEXT") {
               slide.addText(element.text, {
-                x: (element.x - 8 ) / 96,
+                x: (element.x - 8) / 96,
                 y: element.y / 96,
                 w: (element.width + 16) / 80,
                 h: element.height / 96,
@@ -420,21 +433,31 @@
             }
           });
         }
-
+    
         pptx.write('blob').then((pptBlob) => {
           const link = document.createElement('a');
           const url = URL.createObjectURL(pptBlob);
           link.href = url;
           link.download = 'presentation.pptx';
           link.click();
-
+    
           statusDiv.textContent = "PPTX file generated!";
+          hideStatus(); // Hide status after the export
+          enableConvertButton(); // Re-enable the button after processing
         }).catch(error => {
           statusDiv.textContent = "Error generating PPTX!";
           console.error("Error generating PPTX: ", error);
+          hideStatus(); // Hide the status message even if an error occurs
+          enableConvertButton(); // Re-enable the button in case of error
         });
       }
-
+    
+      function hideStatus() {
+        setTimeout(() => {
+          statusDiv.style.display = 'none'; // Hide the status message after 3 seconds
+        }, 3000);
+      }
+    
       function convertBytesToBase64(bytes) {
         return new Promise((resolve) => {
           const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
@@ -443,7 +466,7 @@
           reader.readAsDataURL(blob);
         });
       }
-
+    
       async function processFrameData(frameData) {
         const processedData = [];
         for (const element of frameData) {
@@ -457,5 +480,8 @@
         return processedData;
       }
     </script>
+    
+    
+    
   </body>
 </html>
