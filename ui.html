@@ -129,6 +129,7 @@
         color: #ffa800;
       }
 
+      /* No Frames Selected Section */
       .no-frames {
         flex-grow: 1;
         display: flex;
@@ -218,12 +219,16 @@
         font-size: 12px;
       }
 
+      /* Sticky Footer with Convert Button, Status, and Progress Bar */
       .footer {
         padding: 16px;
         background-color: #2c2c2c;
         border-top: 1px solid #444444;
         position: sticky;
         bottom: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
 
       .button {
@@ -262,24 +267,26 @@
         margin-bottom: 8px;
       }
 
-      #progress-bar {
-        margin-top: 10px;
-        margin-bottom: 10px;
-        border-radius: 8px;
-        background-color: #3c3c3c;
-        height: 10px;
+      /* Progress Bar Styling */
+      #progress-bar-container {
         width: 100%;
-        display: none;
       }
 
-      #progress-fill {
-        width: 0;
+      #progress-bar {
+        height: 5px;
+        background-color: #444;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+
+      #progress {
+        width: 0%;
         height: 100%;
-        border-radius: 8px;
         background-color: #e05534;
-        transition: width 0.5s ease;
+        transition: width 0.4s;
       }
 
+      /* Hide Footer When Not on Converter Tab */
       .footer.hidden {
         display: none;
       }
@@ -288,6 +295,7 @@
   </head>
   <body>
 
+    <!-- Navigation Bar with Tabs -->
     <div class="nav">
       <div class="nav-item active" id="tab-converter">Converter</div>
       <div class="nav-item" id="tab-settings">Settings</div>
@@ -312,11 +320,13 @@
       <div id="frame-list"></div>
     </div>
 
-    <!-- Footer with Convert Button -->
+    <!-- Footer with Convert Button, Status, and Progress Bar -->
     <div class="footer" id="footer">
       <div id="status"></div>
-      <div id="progress-bar">
-        <div id="progress-fill"></div>
+      <div id="progress-bar-container" style="display: none;">
+        <div id="progress-bar">
+          <div id="progress"></div>
+        </div>
       </div>
       <button class="button disabled" id="convert-btn" disabled>Convert Selected Frames</button>
     </div>
@@ -324,14 +334,42 @@
     <script>
       const convertBtn = document.getElementById('convert-btn');
       const statusDiv = document.getElementById('status');
-      const progressBar = document.getElementById('progress-bar');
-      const progressFill = document.getElementById('progress-fill');
       const footer = document.getElementById('footer');
       const tabs = document.querySelectorAll('.nav-item');
       const frameInfoContainer = document.getElementById('frame-info');
       const frameList = document.getElementById('frame-list');
       const noFramesContainer = document.getElementById('no-frames');
 
+      // Function to update progress bar
+      function updateProgressBar(progress) {
+        const progressBarContainer = document.getElementById('progress-bar-container');
+        const progressBar = document.getElementById('progress');
+
+        // Show the progress bar when processing starts
+        progressBarContainer.style.display = 'block';
+        progressBar.style.width = `${progress}%`;
+
+        // Hide the progress bar once it's completed
+        if (progress >= 100) {
+          setTimeout(() => {
+            progressBarContainer.style.display = 'none';
+          }, 1000);
+        }
+      }
+
+      // Function to update the status message
+      function updateStatus(message) {
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+      }
+
+      function hideStatus() {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 3000);
+      }
+
+      // Add active class to the clicked tab and show/hide the footer
       tabs.forEach(tab => {
         tab.addEventListener('click', function () {
           tabs.forEach(t => t.classList.remove('active'));
@@ -352,44 +390,30 @@
       convertBtn.addEventListener('click', () => {
         if (!convertBtn.classList.contains('disabled')) {
           disableConvertButton();
-          updateStatus("Starting export...");
-          updateProgress(0);
+          updateStatus("Starting conversion...");
           parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
         }
       });
 
+      // Function to disable the convert button
       function disableConvertButton() {
         convertBtn.classList.add('disabled');
         convertBtn.disabled = true;
       }
 
+      // Function to enable the convert button
       function enableConvertButton() {
         convertBtn.classList.remove('disabled');
         convertBtn.disabled = false;
       }
 
-      function updateStatus(message) {
-        statusDiv.textContent = message;
-        statusDiv.style.display = 'block';
-      }
-
-      function updateProgress(value) {
-        progressBar.style.display = 'block';
-        progressFill.style.width = `${value}%`;
-      }
-
-      function resetFeedback() {
-        statusDiv.style.display = 'none';
-        progressBar.style.display = 'none';
-        progressFill.style.width = '0%';
-      }
-
+      // Handle messages from Figma
       window.onmessage = async (event) => {
         const message = event.data.pluginMessage;
 
         if (message.type === 'update-frames') {
           const frames = message.frames;
-          frameList.innerHTML = ""; 
+          frameList.innerHTML = "";
 
           if (frames.length > 0) {
             frames.forEach(frame => {
@@ -419,58 +443,39 @@
         }
 
         if (message.type === 'frame-data-array') {
+          updateStatus("Processing frames...");
           const frameDataArray = message.frameDataArray;
-          await processFrames(frameDataArray);
+          generatePPT(frameDataArray);
+        }
+
+        if (message.type === 'update-progress') {
+          updateProgressBar(message.progress);
         }
       };
 
-      async function processFrames(frameDataArray) {
+      async function generatePPT(frameDataArray) {
         const pptx = new PptxGenJS();
-        updateStatus("Processing frames...");
+        const scaleFactor = 0.75;
         const totalFrames = frameDataArray.length;
 
         for (let i = 0; i < totalFrames; i++) {
-          await addFrameToPPT(pptx, frameDataArray[i]);
-          const progress = ((i + 1) / totalFrames) * 100;
-          updateProgress(progress);
-          updateStatus(`Processed ${i + 1} of ${totalFrames} frames...`);
-        }
-
-        pptx.write('blob').then((pptBlob) => {
-          const link = document.createElement('a');
-          const url = URL.createObjectURL(pptBlob);
-          link.href = url;
-          link.download = 'presentation.pptx';
-          link.click();
-
-          updateStatus("PPTX file generated!");
-          resetFeedback();
-          enableConvertButton();
-        }).catch(error => {
-          updateStatus("Error generating PPTX!");
-          console.error("Error generating PPTX: ", error);
-          resetFeedback();
-          enableConvertButton();
-        });
-      }
-
-      function addFrameToPPT(pptx, frameData) {
-        return new Promise((resolve) => {
+          const frameData = frameDataArray[i];
           const slide = pptx.addSlide();
+          const processedFrameData = await processFrameData(frameData);
 
-          frameData.forEach((element) => {
+          processedFrameData.forEach((element) => {
             if (element.type === "TEXT") {
               slide.addText(element.text, {
-                x: element.x / 96,
+                x: (element.x - 8) / 96,
                 y: element.y / 96,
-                w: element.width / 96,
+                w: (element.width + 16) / 80,
                 h: element.height / 96,
-                fontSize: element.fontSize,
+                fontSize: element.fontSize * scaleFactor,
                 fontFace: element.fontName || "Arial",
                 color: element.fontColor || "#000000",
                 bold: element.fontWeight > 500
               });
-            } else if (element.type === "IMAGE" && element.imageBase64) {
+            } else if (element.type === "IMAGE") {
               slide.addImage({
                 data: element.imageBase64,
                 x: element.x / 96,
@@ -481,7 +486,46 @@
             }
           });
 
-          setTimeout(() => resolve(), 1000);
+          const progress = ((i + 1) / totalFrames) * 100;
+          parent.postMessage({ pluginMessage: { type: 'update-progress', progress } }, '*');
+        }
+
+        pptx.write('blob').then((pptBlob) => {
+          const link = document.createElement('a');
+          const url = URL.createObjectURL(pptBlob);
+          link.href = url;
+          link.download = 'presentation.pptx';
+          link.click();
+
+          updateStatus("PPTX file generated!");
+          hideStatus();
+          enableConvertButton();
+        }).catch(error => {
+          updateStatus("Error generating PPTX!");
+          hideStatus();
+          enableConvertButton();
+        });
+      }
+
+      async function processFrameData(frameData) {
+        const processedData = [];
+        for (const element of frameData) {
+          if (element.type === "IMAGE") {
+            const base64Image = await convertBytesToBase64(element.imageBytes);
+            processedData.push({ ...element, imageBase64: base64Image });
+          } else {
+            processedData.push(element);
+          }
+        }
+        return processedData;
+      }
+
+      function convertBytesToBase64(bytes) {
+        return new Promise((resolve) => {
+          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
         });
       }
     </script>

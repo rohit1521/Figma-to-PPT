@@ -5,11 +5,9 @@ async function updateSelectedFrames() {
   const selectedFrames = figma.currentPage.selection.filter(node => node.type === 'FRAME') as FrameNode[];
 
   const frameData = await Promise.all(selectedFrames.map(async frame => {
-    // Export frame as a PNG thumbnail
     const imageBytes = await frame.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 0.25 } });
     const thumbnail = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
 
-    // Calculate aspect ratio
     const aspectRatio = frame.width / frame.height;
     const aspectRatioWarning = Math.abs(aspectRatio - (16 / 9)) > 0.01;
 
@@ -24,7 +22,6 @@ async function updateSelectedFrames() {
     };
   }));
 
-  // Send the frames data to the UI
   figma.ui.postMessage({ type: 'update-frames', frames: frameData });
 }
 
@@ -46,7 +43,6 @@ figma.ui.onmessage = async (msg) => {
 
     const frameDataArray = [];
 
-    // Loop through all selected frames
     for (const selectedNode of selectedNodes) {
       if (selectedNode.type !== "FRAME") {
         figma.notify("All selected items must be frames.");
@@ -55,29 +51,22 @@ figma.ui.onmessage = async (msg) => {
 
       const frameWidth = selectedNode.width;
       const frameHeight = selectedNode.height;
-
-      // Target size is 960x540 (16:9 ratio)
       const targetWidth = 960;
-
-      // Calculate aspect ratio
       const aspectRatio = frameWidth / frameHeight;
       const targetAspectRatio = 16 / 9;
 
       let scaleFactor = 1;
-
-      // If the aspect ratio is close to 16:9, scale the frame to fit 960x540
       if (Math.abs(aspectRatio - targetAspectRatio) < 0.01) {
-        scaleFactor = targetWidth / frameWidth; // Scale based on width
+        scaleFactor = targetWidth / frameWidth;
       }
 
       const frameData = [];
 
-      // Iterate over children of the frame
       for (const child of selectedNode.children) {
         if (child.type === "TEXT") {
           let fontName = "Unknown";
           let fontColor = "#000";
-          let fontWeight = 400; // Default to normal weight
+          let fontWeight = 400;
 
           if (typeof child.fontName !== "symbol" && child.fontName) {
             fontName = child.fontName.family;
@@ -88,13 +77,13 @@ figma.ui.onmessage = async (msg) => {
             fontColor = rgbToHex(fill.color.r, fill.color.g, fill.color.b);
           }
 
-          let fontSize = 12; // Default font size
+          let fontSize = 12;
           if (typeof child.fontSize === "number") {
             fontSize = child.fontSize * scaleFactor;
           }
 
           if (typeof child.fontWeight !== "symbol" && child.fontWeight > 600) {
-            fontWeight = 700; // Bold weight
+            fontWeight = 700;
           }
 
           frameData.push({
@@ -140,7 +129,6 @@ figma.ui.onmessage = async (msg) => {
   }
 };
 
-// Helper function to convert Figma color to Hex
 function rgbToHex(r: number, g: number, b: number): string {
   r = Math.round(r * 255);
   g = Math.round(g * 255);
