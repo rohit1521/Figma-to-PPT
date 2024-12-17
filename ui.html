@@ -413,12 +413,15 @@
 
         if (message.type === 'update-frames') {
           const frames = message.frames;
+          console.log("Received Frames in order:", frames);
           frameList.innerHTML = "";
 
           if (frames.length > 0) {
             frames.forEach(frame => {
+              console.log(`Frame ${frame.selectionIndex}: ${frame.name}, Background Color: ${frame.backgroundColor}`);
               const frameItem = document.createElement('div');
               frameItem.className = `frame-item ${frame.aspectRatioWarning ? 'non-16-9' : ''}`;
+              frameItem.dataset.selectionIndex = frame.selectionIndex.toString();
               frameItem.innerHTML = `
                 <img class="frame-thumbnail" src="${frame.thumbnail}" alt="Frame Thumbnail">
                 <div class="frame-details">
@@ -445,6 +448,7 @@
         if (message.type === 'frame-data-array') {
           updateStatus("Processing frames...");
           const frameDataArray = message.frameDataArray;
+          console.log("Sending to generatePPT:", frameDataArray);
           generatePPT(frameDataArray);
         }
 
@@ -455,79 +459,101 @@
 
       async function generatePPT(frameDataArray) {
         const pptx = new PptxGenJS();
-        const scaleFactor = 0.75;
+        const scaleFactor = 0.36;
         const totalFrames = frameDataArray.length;
 
-        for (let i = 0; i < totalFrames; i++) {
-          const frameData = frameDataArray[i];
-          const slide = pptx.addSlide();
-          const processedFrameData = await processFrameData(frameData);
+        try {
+          frameDataArray.sort((a, b) => a.selectionIndex - b.selectionIndex);
+          
+          for (let i = 0; i < totalFrames; i++) {
+            const frameData = frameDataArray[i];
+            console.log(`Processing frame ${frameData.selectionIndex} for slide ${i + 1}`);
+            
+            const slide = pptx.addSlide();
 
-          processedFrameData.forEach((element) => {
-            if (element.type === "TEXT") {
-              slide.addText(element.text, {
-                x: (element.x - 8) / 96,
-                y: element.y / 96,
-                w: (element.width + 16) / 80,
-                h: element.height / 96,
-                fontSize: element.fontSize * scaleFactor,
-                fontFace: element.fontName || "Arial",
-                color: element.fontColor || "#000000",
-                bold: element.fontWeight > 500
-              });
-            } else if (element.type === "IMAGE") {
-              slide.addImage({
-                data: element.imageBase64,
-                x: element.x / 96,
-                y: element.y / 96,
-                w: element.width / 96,
-                h: element.height / 96
-              });
+            // Set slide background color
+            if (frameData.backgroundColor) {
+              slide.background = { color: frameData.backgroundColor };
             }
-          });
 
-          const progress = ((i + 1) / totalFrames) * 100;
-          parent.postMessage({ pluginMessage: { type: 'update-progress', progress } }, '*');
-        }
+            // Process frame elements
+            const processedFrameData = await processFrameData(frameData.elements);
 
-        pptx.write('blob').then((pptBlob) => {
-          const link = document.createElement('a');
-          const url = URL.createObjectURL(pptBlob);
-          link.href = url;
-          link.download = 'presentation.pptx';
-          link.click();
+            // Add elements to slide
+            processedFrameData.forEach((element) => {
+              if (element.type === "TEXT") {
+                slide.addText(element.text, {
+                  x: (element.x) / 192,
+                  y: element.y / 192,
+                  w: ((element.width + 32 )/192),
+                  h: (element.height ) / 142,
+                  fontSize: element.fontSize * scaleFactor,
+                  fontFace: element.fontName || "Arial",
+                  color: element.fontColor || "#000000",
+                  bold: element.fontWeight > 500,
+                });
+              } else if (element.type === "IMAGE") {
+                slide.addImage({
+                  data: element.imageBase64,
+                  x: element.x / 192,
+                  y: element.y / 192,
+                  w: element.width / 192,
+                  h: element.height / 192,
+                });
+              }
+            });
+
+            // Update progress
+            const progress = ((i + 1) / totalFrames) * 100;
+            parent.postMessage({ pluginMessage: { type: "update-progress", progress } }, "*");
+          }
+
+          // Generate and download PPTX
+          const pptBlob = await pptx.write("blob");
+          downloadPPT(pptBlob, "presentation.pptx");
 
           updateStatus("PPTX file generated!");
-          hideStatus();
-          enableConvertButton();
-        }).catch(error => {
+        } catch (error) {
+          console.error("Error generating PPTX:", error);
           updateStatus("Error generating PPTX!");
+        } finally {
           hideStatus();
           enableConvertButton();
-        });
+        }
       }
 
-      async function processFrameData(frameData) {
-        const processedData = [];
-        for (const element of frameData) {
-          if (element.type === "IMAGE") {
-            const base64Image = await convertBytesToBase64(element.imageBytes);
-            processedData.push({ ...element, imageBase64: base64Image });
-          } else {
-            processedData.push(element);
-          }
-        }
-        return processedData;
+      async function processFrameData(elements) {
+        // Process images concurrently
+        return Promise.all(
+          elements.map(async (element) => {
+            if (element.type === "IMAGE") {
+              const base64Image = await convertBytesToBase64(element.imageBytes);
+              return { ...element, imageBase64: base64Image };
+            }
+            return element;
+          })
+        );
       }
 
       function convertBytesToBase64(bytes) {
-        return new Promise((resolve) => {
-          const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
+        return new Promise((resolve, reject) => {
+          const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => reject("Failed to convert bytes to base64");
           reader.readAsDataURL(blob);
         });
       }
+
+      function downloadPPT(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
     </script>
   </body>
 </html>
