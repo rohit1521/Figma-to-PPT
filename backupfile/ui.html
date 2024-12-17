@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Figma to PPT</title>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        color: #f0f0f0;
+        background-color: #2c2c2c;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Navigation Section */
+      .nav {
+        display: flex;
+        justify-content: flex-start;
+        padding: 12px;
+        background-color: #2c2c2c;
+        border-bottom: 1px solid #444444;
+      }
+
+      .nav-item {
+        padding: 0 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #b2b2b2;
+        cursor: pointer;
+      }
+
+      .nav-item.active {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      /* Frame Information Section */
+      .frame-info {
+        flex-grow: 1;
+        padding: 12px;
+        background-color: #1c1c1c;
+        border-bottom: 1px solid #444444;
+        overflow-y: auto;
+      }
+
+      .frame-item {
+        background-color: #3c3c3c;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+      }
+
+      .frame-thumbnail {
+        width: 40px;
+        height: 40px;
+        background-color: #555555;
+        border-radius: 5px;
+        margin-right: 10px;
+      }
+
+      .frame-details {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .frame-name {
+        font-size: 12px;
+        max-width: 120px;
+        font-weight: 600;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .frame-text-image-count {
+        font-size: 12px;
+        color: #b2b2b2;
+        margin-top: 4px;
+      }
+
+      .frame-size {
+        font-size: 12px;
+        position: relative;
+        cursor: pointer;
+      }
+
+      /* Tooltip for Aspect Ratio Warning */
+      .frame-size .tooltip {
+        visibility: hidden;
+        width: 200px;
+        background-color: #2c2c2c;
+        color: #fff;
+        text-align: left;
+        border-radius: 5px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 100%;
+        right: 0;
+        margin-bottom: 0px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .frame-size .tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        right: 5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #2c2c2c transparent transparent transparent;
+      }
+
+      .frame-size:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .non-16-9 .frame-size {
+        color: #ffa800;
+      }
+
+      /* No Frames Selected Section */
+      .no-frames {
+        flex-grow: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #ffffff;
+        font-size: 16px;
+        padding: 20px;
+      }
+
+      .no-frames .message-box {
+        position: relative;
+        width: 320px;
+        height: 200px;
+        margin: 0 auto;
+        background-color: #2c2c2c;
+      }
+
+      .message-box .frame-placeholder {
+        width: 160px;
+        height: 100px;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 20px;
+        background-color: #3c3c3c;
+        border-radius: 8px;
+        border: 1px solid #0081f9;
+      }
+
+      .message-box .frame-placeholder::before {
+        content: "#Frame";
+        position: absolute;
+        color: #0081f9;
+        font-size: 12px;
+        top: -20px;
+        left: 0;
+      }
+
+      .message-box .frame-icon {
+        width: 48px;
+        height: 48px;
+        background-color: #444343;
+        position: absolute;
+        top: 40px;
+        left: 10px;
+        border-radius: 8px;
+      }
+
+      .message-box .frame-text {
+        width: 64px;
+        height: 12px;
+        background-color: #444343;
+        position: absolute;
+        top: 40px;
+        left: 70px;
+        border-radius: 4px;
+      }
+
+      .message-box .frame-subtext {
+        width: 40px;
+        height: 12px;
+        background-color: #444343;
+        position: absolute;
+        top: 60px;
+        left: 70px;
+        border-radius: 4px;
+      }
+
+      .message-box .message-text {
+        position: absolute;
+        top: 130px;
+        width: 100%;
+        padding-top: 16px;
+        color: #f0f0f0;
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .message-box .instructions {
+        position: absolute;
+        top: 160px;
+        width: 100%;
+        padding-top: 16px;
+        color: #f0f0f0;
+        font-size: 12px;
+      }
+
+      /* Sticky Footer with Convert Button, Status, and Progress Bar */
+      .footer {
+        padding: 16px;
+        background-color: #2c2c2c;
+        border-top: 1px solid #444444;
+        position: sticky;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .button {
+        background-color: #e05534;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        width: 100%;
+        height: 44px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: none;
+        box-shadow: none;
+        transition: background-color 0.3s;
+      }
+
+      .button.disabled {
+        background-color: #3c3c3c;
+        color: rgba(255, 255, 255, 0.5);
+        cursor: not-allowed;
+      }
+
+      .button:hover:not(.disabled) {
+        background-color: #c04323;
+        transform: scale(1.004);
+      }
+
+      #status {
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      /* Progress Bar Styling */
+      #progress-bar-container {
+        width: 100%;
+      }
+
+      #progress-bar {
+        height: 5px;
+        background-color: #444;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+
+      #progress {
+        width: 0%;
+        height: 100%;
+        background-color: #e05534;
+        transition: width 0.4s;
+      }
+
+      /* Hide Footer When Not on Converter Tab */
+      .footer.hidden {
+        display: none;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.9.0/dist/pptxgen.bundle.js"></script>
+  </head>
+  <body>
+
+    <!-- Navigation Bar with Tabs -->
+    <div class="nav">
+      <div class="nav-item active" id="tab-converter">Converter</div>
+      <div class="nav-item" id="tab-settings">Settings</div>
+      <div class="nav-item" id="tab-about">About</div>
+    </div>
+
+    <!-- No Frames Selected Placeholder -->
+    <div class="no-frames" id="no-frames">
+      <div class="message-box">
+        <div class="frame-placeholder">
+          <div class="frame-icon"></div>
+          <div class="frame-text"></div>
+          <div class="frame-subtext"></div>
+        </div>
+        <div class="message-text">Select frames on Figma to convert</div>
+        <div class="instructions">For the best result, select a frame with a 16:9 aspect ratio.</div>
+      </div>
+    </div>
+
+    <!-- Frame Information Section (List of Frames) -->
+    <div class="frame-info" id="frame-info" style="display: none;">
+      <div id="frame-list"></div>
+    </div>
+
+    <!-- Footer with Convert Button, Status, and Progress Bar -->
+    <div class="footer" id="footer">
+      <div id="status"></div>
+      <div id="progress-bar-container" style="display: none;">
+        <div id="progress-bar">
+          <div id="progress"></div>
+        </div>
+      </div>
+      <button class="button disabled" id="convert-btn" disabled>Convert Selected Frames</button>
+    </div>
+
+    <script>
+      const convertBtn = document.getElementById('convert-btn');
+      const statusDiv = document.getElementById('status');
+      const footer = document.getElementById('footer');
+      const tabs = document.querySelectorAll('.nav-item');
+      const frameInfoContainer = document.getElementById('frame-info');
+      const frameList = document.getElementById('frame-list');
+      const noFramesContainer = document.getElementById('no-frames');
+
+      // Function to update progress bar
+      function updateProgressBar(progress) {
+        const progressBarContainer = document.getElementById('progress-bar-container');
+        const progressBar = document.getElementById('progress');
+
+        // Show the progress bar when processing starts
+        progressBarContainer.style.display = 'block';
+        progressBar.style.width = `${progress}%`;
+
+        // Hide the progress bar once it's completed
+        if (progress >= 100) {
+          setTimeout(() => {
+            progressBarContainer.style.display = 'none';
+          }, 1000);
+        }
+      }
+
+      // Function to update the status message
+      function updateStatus(message) {
+        statusDiv.textContent = message;
+        statusDiv.style.display = 'block';
+      }
+
+      function hideStatus() {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 3000);
+      }
+
+      // Add active class to the clicked tab and show/hide the footer
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function () {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          if (tab.id === 'tab-converter') {
+            footer.classList.remove('hidden');
+            frameInfoContainer.style.display = frameList.childElementCount > 0 ? 'block' : 'none';
+            noFramesContainer.style.display = frameList.childElementCount === 0 ? 'flex' : 'none';
+          } else {
+            footer.classList.add('hidden');
+            frameInfoContainer.style.display = "none";
+            noFramesContainer.style.display = 'none';
+          }
+        });
+      });
+
+      convertBtn.addEventListener('click', () => {
+        if (!convertBtn.classList.contains('disabled')) {
+          disableConvertButton();
+          updateStatus("Starting conversion...");
+          parent.postMessage({ pluginMessage: { type: 'request-frame-data' } }, '*');
+        }
+      });
+
+      // Function to disable the convert button
+      function disableConvertButton() {
+        convertBtn.classList.add('disabled');
+        convertBtn.disabled = true;
+      }
+
+      // Function to enable the convert button
+      function enableConvertButton() {
+        convertBtn.classList.remove('disabled');
+        convertBtn.disabled = false;
+      }
+
+      // Handle messages from Figma
+      window.onmessage = async (event) => {
+        const message = event.data.pluginMessage;
+
+        if (message.type === 'update-frames') {
+          const frames = message.frames;
+          frameList.innerHTML = "";
+
+          if (frames.length > 0) {
+            frames.forEach(frame => {
+              const frameItem = document.createElement('div');
+              frameItem.className = `frame-item ${frame.aspectRatioWarning ? 'non-16-9' : ''}`;
+              frameItem.innerHTML = `
+                <img class="frame-thumbnail" src="${frame.thumbnail}" alt="Frame Thumbnail">
+                <div class="frame-details">
+                  <div class="frame-name">${frame.name}</div>
+                  <div class="frame-text-image-count">${frame.textCount} Texts, ${frame.imageCount} Images</div>
+                </div>
+                <div class="frame-size">${frame.width} x ${frame.height}
+                  ${frame.aspectRatioWarning ? '<div class="tooltip">Aspect ratio is not 16:9, conversion may not look optimal.</div>' : ''}
+                </div>
+              `;
+              frameList.appendChild(frameItem);
+            });
+
+            enableConvertButton();
+            frameInfoContainer.style.display = 'block';
+            noFramesContainer.style.display = 'none';
+          } else {
+            disableConvertButton();
+            frameInfoContainer.style.display = 'none';
+            noFramesContainer.style.display = 'flex';
+          }
+        }
+
+        if (message.type === 'frame-data-array') {
+          updateStatus("Processing frames...");
+          const frameDataArray = message.frameDataArray;
+          generatePPT(frameDataArray);
+        }
+
+        if (message.type === 'update-progress') {
+          updateProgressBar(message.progress);
+        }
+      };
+
+      async function generatePPT(frameDataArray) {
+  const pptx = new PptxGenJS();
+  const scaleFactor = 0.36; // Scaling for text size
+  const totalFrames = frameDataArray.length;
+
+  try {
+    for (let i = 0; i < totalFrames; i++) {
+      const frameData = frameDataArray[i];
+      const slide = pptx.addSlide();
+
+      // Process frame elements
+      const processedFrameData = await processFrameData(frameData);
+
+      // Add elements to slide
+      processedFrameData.forEach((element) => {
+        if (element.type === "TEXT") {
+          slide.addText(element.text, {
+            x: (element.x) / 192,
+            y: element.y / 192,
+            w: (element.width) / 192,
+            h: element.height / 192,
+            fontSize: element.fontSize * scaleFactor,
+            fontFace: element.fontName || "Arial",
+            color: element.fontColor || "#000000",
+            bold: element.fontWeight > 500,
+          });
+        } else if (element.type === "IMAGE") {
+          slide.addImage({
+            data: element.imageBase64,
+            x: element.x / 192,
+            y: element.y / 192,
+            w: element.width / 192,
+            h: element.height / 192,
+          });
+        }
+      });
+
+      // Progress update
+      const progress = ((i + 1) / totalFrames) * 100;
+      parent.postMessage({ pluginMessage: { type: "update-progress", progress } }, "*");
+    }
+
+    // Generate and download PPTX
+    const pptBlob = await pptx.write("blob");
+    downloadPPT(pptBlob, "presentation.pptx");
+
+    updateStatus("PPTX file generated!");
+  } catch (error) {
+    console.error("Error generating PPTX:", error);
+    updateStatus("Error generating PPTX!");
+  } finally {
+    hideStatus();
+    enableConvertButton();
+  }
+}
+
+async function processFrameData(frameData) {
+  // Process images concurrently
+  return Promise.all(
+    frameData.map(async (element) => {
+      if (element.type === "IMAGE") {
+        const base64Image = await convertBytesToBase64(element.imageBytes);
+        return { ...element, imageBase64: base64Image };
+      }
+      return element;
+    })
+  );
+}
+
+function convertBytesToBase64(bytes) {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([new Uint8Array(bytes)], { type: "image/png" });
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = () => reject("Failed to convert bytes to base64");
+    reader.readAsDataURL(blob);
+  });
+}
+
+function downloadPPT(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+    </script>
+  </body>
+</html>
